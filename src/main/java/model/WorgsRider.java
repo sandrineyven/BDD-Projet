@@ -12,5 +12,6 @@ public class WorgsRider extends Monster {
         this.speed = 20;
         this.armor = 18;
         this.damage = 2;
+        this.weaponAttack = 4;
     }
 }

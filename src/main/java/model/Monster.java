@@ -10,6 +10,7 @@ public abstract class Monster implements Serializable {
     public long id;
     public String name;
     public int team = 1;
+    //Coordonnées de position
     public double x = 0;
     public double y = 0;
     public double z = 0;
@@ -19,32 +20,36 @@ public abstract class Monster implements Serializable {
     public int range = 10;
     public int armor = 18;
     public int damage = 10;
+    public int weaponAttack = 20;
+    public int nbAttack = 1;
 
+    //Pour l'affichage
     @Override
     public String toString() {
-        return "[" + this.id + "] " + this.name + " : " + this.hp +" HP"+ " - ("
+        return "[" + this.id + "] " + this.name + " : " + this.hp + " HP" + " - ("
                 + this.x + " ; " + this.y + " ; " + this.z + ")";
     }
 
+    //Simulation d'un dé
     public int generateRandom(int min, int max) {
         int range = max - min + 1;
         return (int) (Math.random() * range) + min;
     }
 
-
+    //Initialisation des position sur la map (150*150)
     public void initPosition(ArrayList<Monster> allMonsters) {
 
         //Taille du plateau de jeu
-        double minX = -100;
-        double maxX = 100;
+        double minX = -150;
+        double maxX = 150;
 
-        double minY = -100;
-        double maxY = 100;
+        double minY = -150;
+        double maxY = 150;
 
         //Repartition des monstres d'une part et d'autre
-        if(this.team == 1){
+        if (this.team == 1) {
             minX = 0;
-        }else{
+        } else {
             maxX = 0;
         }
 
@@ -61,6 +66,7 @@ public abstract class Monster implements Serializable {
 
     }
 
+    //Test si la place est libre
     private boolean checkIsFree(double x, double y, ArrayList<Monster> monsters) {
         int distMin = 1;
         for (Monster m : monsters) {
@@ -73,6 +79,7 @@ public abstract class Monster implements Serializable {
     }
 
 
+    //Si la creature peut toucher l'ennemi, elle attaque, sinon elle bouge
     public String decideAction(ArrayList<Monster> monsters) {
 
         List<Monster> enemies = detectEnemies(monsters);
@@ -84,32 +91,37 @@ public abstract class Monster implements Serializable {
         return "move";
     }
 
+    //Detection des ennemies a porté
     public List<Monster> detectEnemies(ArrayList<Monster> allMobs) {
         ArrayList<Monster> enemies = new ArrayList<>();
         for (Monster enemy : allMobs) {
             if (enemy.team != this.team && enemy.isAlive && canTouchEnemy(enemy)) enemies.add(enemy);
         }
-        if(enemies.size() > 1)
-            return enemies.subList(0,1);
+        if (enemies.size() > this.nbAttack)
+            return enemies.subList(0, this.nbAttack);
         else
-        return enemies;
+            return enemies;
     }
 
-    private Monster detectCloserEnemy(ArrayList<Monster> allMonsters){
+    //Détecte l'ennemie le plus proche
+    private Monster detectCloserEnemy(ArrayList<Monster> allMonsters) {
         int lowestDistance = Integer.MAX_VALUE;
         Monster closestEnemy = null;
-        for(Monster enemy : allMonsters) {
-            if(enemy.team == this.team || !enemy.isAlive) continue;
+        for (Monster enemy : allMonsters) {
+            if (enemy.team == this.team || !enemy.isAlive) continue;
             double dx = enemy.x - this.x;
             double dy = enemy.y - this.y;
             double dz = enemy.z - this.z;
-            double distance = Math.sqrt(dx*dx + dy*dy + dz*dz);
-            if(distance < lowestDistance){ closestEnemy = enemy; }
+            double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            if (distance < lowestDistance) {
+                closestEnemy = enemy;
+            }
         }
         return closestEnemy;
     }
 
-    public double[] getMoveToPerform(ArrayList<Monster> allMonsters) {
+    //Determiner la future position de la creature
+    public double[] getNewPosition(ArrayList<Monster> allMonsters) {
 
         Monster closestEnemy = detectCloserEnemy(allMonsters);
         double xDest = closestEnemy.x;
@@ -120,8 +132,8 @@ public abstract class Monster implements Serializable {
         double deltaY = yDest - this.y;
         double deltaZ = zDest - this.z;
         double goalDistance = Math.sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
-        if (goalDistance > speed) // The enemy is too far
-        {
+        //L'ennemi est trop loin, on se rapproche au maximum
+        if (goalDistance > speed) {
             double ratio = speed / goalDistance;
             double xMove = ratio * deltaX;
             double yMove = ratio * deltaY;
@@ -130,43 +142,51 @@ public abstract class Monster implements Serializable {
             double newY = this.y + yMove;
             double newZ = 0.0;
             return new double[]{newX, newY, newZ};
-        } else // The enemy can be reached in one move
-        {
+        } else {
+            //L'ennemi est accessible, on se place a une case de lui
             return new double[]{xDest - 1, yDest - 1, 0};
         }
 
     }
 
-
+    //Met a jour les coordonnees
     public void move(double[] newPosition) {
         this.x = newPosition[0];
         this.y = newPosition[1];
         this.z = newPosition[2];
     }
 
+    //Test si l'ennemi est a porté
     public boolean canTouchEnemy(Monster enemy) {
         double x = Math.abs(this.x - enemy.x);
         double y = Math.abs(this.y - enemy.y);
         double z = Math.abs(this.z - enemy.z);
         double distance = Math.sqrt(x * x + y * y + z * z);
         if (distance <= this.range) {
-                return true;
+            return true;
         }
-
         return false;
-
     }
 
-    public int damage() {
+    //Determine sil l'ennemi est touché et si oui calcul des dégats
+    public int damage(Monster enemy) {
 
-        return this.damage + this.generateRandom(1,8);
+        int dice = this.generateRandom(1, 20);
+        int touch = this.weaponAttack + dice;
+
+        if ((touch > enemy.armor) || (dice == 20)) {
+            return this.damage + this.generateRandom(1, 8);
+        } else {
+            System.out.println("missed " + touch + " " + enemy.armor);
+            return 0;
+        }
     }
 
+    //Mise a jour des stats
     public void isAttacked(int damage) {
-
-        if(damage >= this.hp) hp = 0;
+        if (damage >= this.hp) hp = 0;
         else this.hp -= damage;
-        if(this.hp <= 0){
+        if (this.hp <= 0) {
             this.isAlive = false;
         }
     }

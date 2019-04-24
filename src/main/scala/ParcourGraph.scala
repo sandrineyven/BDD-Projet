@@ -23,12 +23,12 @@ class ParcourGraph extends Serializable {
 
   //Fonction sendMessage
   def sendMonsterMessages(ctx: EdgeContext[Node, String, Array[Monster]]): Unit = {
-    // Envoi seulement si le monstre est en vie
+    // Envoi seulement si les monstres sont en vie
     if (ctx.srcAttr.monster.isAlive && ctx.dstAttr.monster.isAlive) {
-      val arrayDst = Array(ctx.srcAttr.monster)
-      val arraySrc = Array(ctx.dstAttr.monster)
-      ctx.sendToDst(arrayDst)
-      ctx.sendToSrc(arraySrc)
+      val arraySrc = Array(ctx.srcAttr.monster)
+      val arrayDst = Array(ctx.dstAttr.monster)
+      ctx.sendToDst(arraySrc)
+      ctx.sendToSrc(arrayDst)
     }
   }
 
@@ -39,49 +39,52 @@ class ParcourGraph extends Serializable {
     array
   }
 
+  //Creation du message
   def ChooseAction(vid: VertexId, vertex: Node, monsters: Array[Monster]): Node = {
     val m = new util.ArrayList[Monster]()
 
-    monsters.foreach(monster => {m.add(monster)})
+    monsters.foreach(monster => {
+      m.add(monster)
+    })
 
     val chosenAction = vertex.monster.decideAction(m)
 
+    //S'il décide de bouger
     if (chosenAction.equals("move")) {
-      // Send a message "move" containing the new position
-      val newPosition = vertex.monster.getMoveToPerform(monsterList)
+      val newPosition = vertex.monster.getNewPosition(monsterList)
       vertex.messagesToTreat += new Message("move", newPosition(0), newPosition(1), newPosition(2))
       println(" Monster " + vertex.monster + ANSI_PURPLE + " WILL MOVE TO (" + newPosition(0) + " ; " + newPosition(1) + " ; " + newPosition(2) + ")" + ANSI_RESET)
       vertex.monster.move(newPosition)
       new Node(vertex.id, vertex.monster, vertex.messagesToTreat)
     }
-    else
-    {
+    //S'il décide d'attaquer
+    else {
       val monsters = vertex.monster.detectEnemies(monsterList)
-      for (i <- 0 until monsters.size())
-      {
-        val monster = monsters.get(i)
-        val damage = vertex.monster.damage()
-        vertex.messagesToTreat += new Message("attack", vertex.monster.id, monster.id, damage)
-        println("Monster " + vertex.monster + ANSI_RED + " WIIL ATTACK " + monster + " : damage = " + damage + ANSI_RESET )
+      for (i <- 0 until monsters.size()) {
+        val monsterEnemy = monsters.get(i)
+        val damage = vertex.monster.damage(monsterEnemy)
+        vertex.messagesToTreat += new Message("attack", vertex.monster.id, monsterEnemy.id, damage)
+        println("Monster " + vertex.monster + ANSI_RED + " WIIL ATTACK " + monsterEnemy + " : damage = " + damage + ANSI_RESET)
+        if (damage == 0) {
+          println(ANSI_RED + " BUT " + vertex.monster.name + "  MISSED " + monsterEnemy.name + "... damage = " + damage + ANSI_RESET)
+        }
       }
-
       new Node(vertex.id, vertex.monster, vertex.messagesToTreat)
     }
 
   }
 
+  //Applique les consequence de choix de l'action
   def performActions(vid: VertexId, vertex: Node, mergedMessages: List[Message]): Node = {
 
     mergedMessages.foreach(message => {
-      if (message.actionToPerform.equals("move"))
-      {
+      if (message.actionToPerform.equals("move")) {
         val newPosition = Array[Double](message.x, message.y, message.z)
         vertex.monster.move(newPosition)
       }
-      else if (message.actionToPerform.equals("isAttacked"))
-      {
+      else if (message.actionToPerform.equals("isAttacked")) {
         vertex.monster.isAttacked(message.z.toInt)
-        println("Monster " + vertex.monster + ANSI_RED + " HAS BEEN ATTACK - DAMAGES = " + message.z.toInt  + ANSI_RESET )
+        println("Monster " + vertex.monster + ANSI_RED + " HAS BEEN ATTACK - DAMAGES = " + message.z.toInt + ANSI_RESET)
       }
 
     })
@@ -91,16 +94,14 @@ class ParcourGraph extends Serializable {
     new Node(vertex.id, vertex.monster, vertex.messagesToTreat)
   }
 
+  //Construction du message d'action
   def sendActionMessages(ctx: EdgeContext[Node, String, List[Message]]): Unit = {
     //Source
-    if(ctx.srcAttr.monster.isAlive)
-    {
+    if (ctx.srcAttr.monster.isAlive) {
       ctx.srcAttr.messagesToTreat.foreach(message => {
         if (message.actionToPerform == "move") ctx.sendToSrc(List(message))
-        else if (message.actionToPerform == "attack")
-        {
-          if (ctx.dstAttr.monster.isAlive && message.y == ctx.dstAttr.monster.id)
-          {
+        else if (message.actionToPerform == "attack") {
+          if (ctx.dstAttr.monster.isAlive && message.y == ctx.dstAttr.monster.id) {
             ctx.sendToDst(List(new Message("isAttacked", message.x, message.y, message.z)))
           }
         }
@@ -108,14 +109,11 @@ class ParcourGraph extends Serializable {
     }
 
     //Destination
-    if(ctx.dstAttr.monster.isAlive)
-    {
+    if (ctx.dstAttr.monster.isAlive) {
       ctx.dstAttr.messagesToTreat.foreach(message => {
         if (message.actionToPerform.equals("move")) ctx.sendToDst(List(message))
-        else if (message.actionToPerform.equals("attack"))
-        {
-          if (ctx.srcAttr.monster.isAlive && message.y == ctx.srcAttr.monster.id)
-          {
+        else if (message.actionToPerform.equals("attack")) {
+          if (ctx.srcAttr.monster.isAlive && message.y == ctx.srcAttr.monster.id) {
             ctx.sendToSrc(List(new Message("isAttacked", message.x, message.y, message.z)))
           }
         }
@@ -127,42 +125,39 @@ class ParcourGraph extends Serializable {
 
     val moveMessages1 = messages1.filter(msg => msg.actionToPerform.equals("move"))
     var moves = List[Message]()
-    if (moveMessages1.nonEmpty) { moves = List(moveMessages1.head) }
-    else
-    {
+    if (moveMessages1.nonEmpty) {
+      moves = List(moveMessages1.head)
+    }
+    else {
       val moveMessages2 = messages2.filter(msg => msg.actionToPerform.equals("move"))
-      if (moveMessages2.nonEmpty) { moves = List(moveMessages2.head) }
+      if (moveMessages2.nonEmpty) {
+        moves = List(moveMessages2.head)
+      }
     }
 
-
+    //Concatenation de tous les dégats subits
     val isAttackedMessages1 = messages1.filter(msg => msg.actionToPerform.equals("isAttacked"))
     val isAttackedMessages2 = messages2.filter(msg => msg.actionToPerform.equals("isAttacked"))
-
     var totalDamage = 0.0
     isAttackedMessages1.foreach(msg => totalDamage += msg.z.toDouble)
     isAttackedMessages2.foreach(msg => totalDamage += msg.z.toDouble)
 
     var isAttacked = List[Message]()
 
-    if (isAttackedMessages1.nonEmpty || isAttackedMessages2.nonEmpty)
-    {
+    if (isAttackedMessages1.nonEmpty || isAttackedMessages2.nonEmpty) {
       isAttacked = List(new Message("isAttacked", 0, 0, totalDamage))
     }
 
-    if (moves.nonEmpty && isAttacked.nonEmpty)
-    {
+    if (moves.nonEmpty && isAttacked.nonEmpty) {
       List(moves, isAttacked).flatten
     }
-    else if (moves.isEmpty && isAttacked.nonEmpty)
-    {
+    else if (moves.isEmpty && isAttacked.nonEmpty) {
       List(isAttacked).flatten
     }
-    else if (moves.nonEmpty && isAttacked.isEmpty)
-    {
+    else if (moves.nonEmpty && isAttacked.isEmpty) {
       List(moves).flatten
     }
-    else
-    {
+    else {
       List(moves).flatten
     }
 
@@ -189,13 +184,13 @@ class ParcourGraph extends Serializable {
 
 
         monsterList.clear()
-        //Recuperation des monstres
+        //Recuperation des monstres pour l'intialisation
         val allVertices = myGraph.vertices.collect()
         allVertices.foreach(vertex => {
           monsterList.add(vertex._2.monster)
         })
 
-        println("ITERATION NUMERO : " + (counter + 1))
+        println("ITERATION N° " + (counter + 1))
         counter += 1
         if (counter == maxIterations) return
 
@@ -224,17 +219,13 @@ class ParcourGraph extends Serializable {
           (vid, vertex, totalDamage) => performActions(vid, vertex, totalDamage)
         )
 
-        //Ignorez : Code de debug
         var printedGraph = myGraph.vertices.collect()
         printedGraph = printedGraph.sortBy(_._1)
-        printedGraph.foreach(
-          elem => println(elem._2.toString())
-        )
       }
 
     }
 
-    loop //execute loop
+    loop //Execute la boucle de jeu
     myGraph //return the result graph
   }
 }

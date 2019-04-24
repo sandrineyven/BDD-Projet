@@ -11,6 +11,7 @@ public class BarbareOrc extends Monster {
         this.hp = 142;
         this.speed = 40;
         this.armor = 17;
+        this.weaponAttack = 19;
     }
 
 }
