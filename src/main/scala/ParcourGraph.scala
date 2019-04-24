@@ -197,7 +197,7 @@ class ParcourGraph extends Serializable {
         val messages = myGraph.aggregateMessages[Array[Monster]](
           sendMonsterMessages,
           mergeMonsterMessages,
-          fields //use an optimized join strategy (we don't need the edge attribute)
+          fields
         )
 
         if (messages.isEmpty()) {
@@ -226,6 +226,6 @@ class ParcourGraph extends Serializable {
     }
 
     loop //Execute la boucle de jeu
-    myGraph //return the result graph
+    myGraph
   }
 }
